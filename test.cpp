@@ -1,10 +1,10 @@
-#include "sdl.h"
 #include "test.h"
 #include <SDL.h>
 #include <stdio.h>
 #include <SDL_image.h>
 #include <string>
 #include <vector>
+#include <chrono> // for timing
 
 const int SCREEN_WIDTH = 800;
 const int SCREEN_HEIGHT = 600;
@@ -15,6 +15,17 @@ SDL_Renderer* gRenderer = NULL;
 int speed = 0.1;
 int CameraX = 0;
 int textureWidthDiff = IMAGE_WIDTH - SCREEN_WIDTH;
+
+struct Ball {
+    int x, y;
+    int dx, dy;
+};
+
+const int BALL_RADIUS = 72;
+const int GRAVITY = 1;
+const int CHANGE_DIRECTION_INTERVAL = 3000; // change direction every 3 seconds
+Ball ball;
+std::chrono::steady_clock::time_point lastDirectionChange;
 
 SDL_Texture* loadTexture(const std::string& path) {
     // The final texture
@@ -87,12 +98,46 @@ void closeSDL()
     SDL_Quit();
 }
 
+void updateBall() {
+    // Check if it's time to change direction
+    auto now = std::chrono::steady_clock::now();
+    if (std::chrono::duration_cast<std::chrono::milliseconds>(now - lastDirectionChange).count() > CHANGE_DIRECTION_INTERVAL) {
+        ball.dx *= -1;
+        lastDirectionChange = now;
+    }
+
+    if (ball.y > 0 || ball.y + BALL_RADIUS < SCREEN_HEIGHT) {
+        ball.dy += GRAVITY;
+    }
+
+    ball.x += ball.dx;
+    ball.y += ball.dy;
+
+    //printf("y Value is: %d\n", ball.y);
+
+    // Check collision with window edges
+    if (ball.x < 0 || ball.x + BALL_RADIUS > SCREEN_WIDTH) {
+        ball.dx *= -1;
+    }
+    if (ball.y < 0 || ball.y + BALL_RADIUS > SCREEN_HEIGHT) {
+        ball.dy *= -1;
+        printf("y Value is: %d\n", ball.y);
+
+        if (std::abs(ball.dy) < 3) {
+            ball.y = SCREEN_HEIGHT - BALL_RADIUS;
+        }
+    }
+}
+
+
 int main(int argc, char* argv[]) {
     if (!initSDL()) {
         printf("Failed to initialize SDL!\n");
         return -1;
     }
 
+
+    /*
     std::vector<SDL_Texture*> backgroundTextures;
     backgroundTextures.push_back(loadTexture("./Assets/Pixel_Forest/layer0.png"));
     backgroundTextures.push_back(loadTexture("./Assets/Pixel_Forest/layer1.png"));
@@ -106,12 +151,14 @@ int main(int argc, char* argv[]) {
     backgroundTextures.push_back(loadTexture("./Assets/Pixel_Forest/layer9.png"));
     backgroundTextures.push_back(loadTexture("./Assets/Pixel_Forest/layer10.png"));
     backgroundTextures.push_back(loadTexture("./Assets/Pixel_Forest/layer11.png"));
+    */
 
-
-
-
-    SDL_Texture* backgroundFloor = loadTexture("./Assets/grassfloor.png");
-    SDL_Texture* backgroundSky = loadTexture("./Assets/skytoon.jpg");
+    SDL_Texture* ballText = loadTexture("./Assets/ball.png");
+    ball.x = SCREEN_WIDTH / 2;
+    ball.y = SCREEN_HEIGHT / 2;
+    ball.dx = 5;
+    ball.dy = 0;
+    lastDirectionChange = std::chrono::steady_clock::now();
 
     // Main loop flag
     bool quit = false;
@@ -131,28 +178,34 @@ int main(int argc, char* argv[]) {
         // Clear screen
         SDL_RenderClear(gRenderer);
 
-        //SDL_Rect skyDest = { 0, -400, 800, 810 };
-        //SDL_RenderCopy(gRenderer, backgroundSky, NULL, &skyDest);
+        updateBall();
+
+        SDL_Rect ballRect = { ball.x, ball.y, BALL_RADIUS, BALL_RADIUS };
+        SDL_RenderCopy(gRenderer, ballText, NULL, &ballRect);
 
         //SDL_RenderCopy(gRenderer, backgroundFloor, NULL, NULL);
 
+        /*
         for (SDL_Texture* texture : backgroundTextures) {
             SDL_Rect textureDest = { 0, 0, IMAGE_WIDTH, SCREEN_HEIGHT };
             SDL_RenderCopy(gRenderer, texture, NULL, &textureDest);
         }
+        */
 
         // Update screen
         SDL_RenderPresent(gRenderer);
+        SDL_Delay(10);
     }
 
     // Destroy textures
     //SDL_DestroyTexture(enemyTexture);
-    SDL_DestroyTexture(backgroundFloor);
-    SDL_DestroyTexture(backgroundSky);
+    SDL_DestroyTexture(ballText);
 
+    /*
     for (SDL_Texture* texture : backgroundTextures) {
         SDL_DestroyTexture(texture);
     }
+    */
 
     // Close SDL
     closeSDL();
